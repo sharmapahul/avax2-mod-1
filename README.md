@@ -1,110 +1,110 @@
-
-# ErrorHandlingExample Smart Contract
-
-This smart contract demonstrates the use of `require()`, `assert()`, and `revert()` statements in Solidity for error handling. It includes functions for depositing and withdrawing Ether, and a function to reset the contract which demonstrates the use of `revert()`.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Functions](#functions)
-- [Usage](#usage)
-- [Error Handling](#error-handling)
-- [Development](#development)
-- [License](#license)
+# StakingToken
 
 ## Overview
 
-The `ErrorHandlingExample` contract allows an owner to deposit and withdraw Ether, and includes proper error handling mechanisms using Solidity's `require()`, `assert()`, and `revert()` statements.
+StakingToken is a Solidity smart contract built on the Ethereum blockchain, implementing an ERC20 token with additional staking and reward distribution functionalities. It allows users to stake tokens, earn rewards, and manage their stakes. This contract uses OpenZeppelin libraries for security and standardization.
 
-## Functions
+## Features
 
-### Constructor
+- **ERC20 Standard:** Implements standard ERC20 functions and interface.
+- **Token Minting and Burning:** Allows the owner to mint new tokens and users to burn their tokens.
+- **Staking Mechanism:** Users can stake tokens and receive rewards.
+- **Reward Distribution:** The owner can distribute rewards to stakers proportionally to their stakes.
+- **Claiming Rewards:** Users can claim their accumulated rewards.
+- **Access Control:** Utilizes OpenZeppelin's `Ownable` contract to restrict certain functions to the owner.
 
-```solidity
-constructor()
-```
+## Dependencies
 
-Initializes the contract, setting the deployer as the owner and the initial balance to 0.
+- OpenZeppelin Contracts:
+  - `ERC20`
+  - `ERC20Burnable`
+  - `Ownable`
 
-### deposit
+## Prerequisites
 
-```solidity
-function deposit() public payable
-```
+- Solidity ^0.8.0
+- Node.js with npm
+- Truffle or Hardhat for contract deployment
+- MetaMask or other Ethereum wallet for interaction
 
-Allows anyone to deposit Ether into the contract. The deposit amount must be greater than zero.
+## Contract Details
 
-### withdraw
+### State Variables
 
-```solidity
-function withdraw(uint256 amount) public
-```
+- `contractBalance`: Tracks the contract's token balance.
+- `stakes`: Maps addresses to their staked token amounts.
+- `rewards`: Maps addresses to their accumulated rewards.
+- `stakers`: An array of addresses that have staked tokens.
+- `isStaker`: Tracks whether an address is currently staking.
 
-Allows the owner to withdraw a specified amount of Ether from the contract. Ensures that the owner is the one initiating the withdrawal and that the contract has sufficient balance.
+### Errors
 
-### resetContract
+- `NotOwner()`: Thrown when a non-owner tries to call a restricted function.
+- `InsufficientBalance(requested, available)`: Thrown when a user tries to unstake more tokens than they have staked.
+- `TransferFailed()`: Thrown when a token transfer fails.
+- `NoStake()`: Thrown when there is no stake or reward to process.
+- `ZeroAmount()`: Thrown when a zero amount is provided for staking or unstaking.
 
-```solidity
-function resetContract() public
-```
+### Functions
 
-Allows the owner to reset the contract. For demonstration purposes, this function always reverts the transaction.
-
-### getBalance
-
-```solidity
-function getBalance() public view returns (uint256)
-```
-
-Returns the current balance of the contract.
+- `constructor(address payable initialOwner)`: Initializes the contract, setting the initial owner and token details.
+- `mintTokens(uint256 amount)`: Allows the owner to mint new tokens.
+- `burnTokens(uint256 amount)`: Allows users to burn their tokens.
+- `stakeTokens(uint256 amount)`: Allows users to stake tokens. Adds new stakers to the list.
+- `unstakeTokens(uint256 amount)`: Allows users to unstake tokens. Updates staker status if no tokens are left.
+- `distributeRewards(uint256 rewardAmount)`: Distributes rewards to stakers based on their staked amounts.
+- `claimRewards()`: Allows users to claim their accumulated rewards.
+- `getTotalStaked()`: Returns the total amount of tokens staked in the contract.
+- `getStakersCount()`: Returns the number of unique stakers.
+- `getStakerAt(uint256 index)`: Returns the address of a staker at a specific index.
 
 ## Usage
 
-1. **Deploy the Contract**
+### Deployment
 
-   Deploy the `ErrorHandlingExample` contract using Remix, Truffle, or any other Ethereum development framework.
+1. Clone the repository and navigate to the project directory.
+2. Install dependencies using `npm install`.
+3. Compile the contract using `truffle compile` or `npx hardhat compile`.
+4. Deploy the contract using `truffle migrate` or `npx hardhat run scripts/deploy.js`.
 
-2. **Deposit Ether**
+### Interaction
 
-   Call the `deposit()` function to send Ether to the contract. The deposit amount must be greater than zero.
+1. Use a web3 provider (like MetaMask) to interact with the deployed contract.
+2. Call `mintTokens` to mint new tokens (owner only).
+3. Use `stakeTokens` to stake tokens.
+4. Use `unstakeTokens` to unstake tokens.
+5. Call `distributeRewards` to distribute rewards (owner only).
+6. Use `claimRewards` to claim your accumulated rewards.
 
-3. **Check Balance**
+### Example
 
-   Use the `getBalance()` function to check the current balance of the contract.
+```solidity
+// Deploying the contract
+const StakingToken = artifacts.require("StakingToken");
 
-4. **Withdraw Ether**
+module.exports = function(deployer) {
+  deployer.deploy(StakingToken, "0xYourEthereumAddress");
+};
 
-   Call the `withdraw()` function to withdraw Ether from the contract. Only the owner can perform this action and the contract must have sufficient balance.
+// Staking tokens
+await stakingToken.stakeTokens(web3.utils.toWei('10', 'ether'), { from: userAddress });
 
-5. **Reset Contract**
+// Unstaking tokens
+await stakingToken.unstakeTokens(web3.utils.toWei('5', 'ether'), { from: userAddress });
 
-   Call the `resetContract()` function. This will always revert the transaction for demonstration purposes.
+// Distributing rewards
+await stakingToken.distributeRewards(web3.utils.toWei('100', 'ether'), { from: ownerAddress });
 
-## Error Handling
+// Claiming rewards
+await stakingToken.claimRewards({ from: userAddress });
+```
 
-- **`require()`**: Used to validate conditions before executing a function.
-  - Ensures deposit amount is greater than zero.
-  - Ensures only the owner can withdraw funds.
-  - Ensures the contract has sufficient balance for withdrawal.
+## Security Considerations
 
-- **`assert()`**: Used to check for conditions that should never be false.
-  - Ensures the contract balance is never negative after a withdrawal.
-
-- **`revert()`**: Used to handle exceptional situations.
-  - Demonstrates contract reset functionality by always reverting the transaction.
-
-## Development
-
-To modify or extend this contract, follow these steps:
-
-1. Clone the repository.
-2. Make your changes in the `ErrorHandlingExample.sol` file.
-3. Compile and deploy the contract using your preferred Ethereum development framework.
+- Ensure only the contract owner can mint new tokens and distribute rewards.
+- Validate user inputs to prevent unexpected behaviors.
+- Regularly audit the contract code to identify and fix potential vulnerabilities.
 
 ## License
 
-This project is licensed under the MIT License.
-
----
-
-This README file provides an overview, usage instructions, and details on the functions and error handling mechanisms used in the `ErrorHandlingExample` smart contract.
+This project is licensed under the MIT License. See the `LICENSE` file for details.
