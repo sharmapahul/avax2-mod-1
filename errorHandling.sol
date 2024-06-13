@@ -1,42 +1,107 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract ErrorHandlingExample {
-    
-    uint256 public balance;
-    address public owner;
-    
-    constructor() {
-        owner = msg.sender;
-        balance = 0;
-    }
-    
-    // Function to deposit ether to the contract
-    function deposit() public payable {
-        require(msg.value > 0, "Deposit amount must be greater than zero");
-        balance += msg.value;
-    }
-    
-    // Function to withdraw ether from the contract
-    function withdraw(uint256 amount) public {
-        require(msg.sender == owner, "Only the owner can withdraw funds");
-        require(amount <= balance, "Insufficient balance");
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-        // This is a sanity check, balance should never be negative
-        assert(balance >= amount);
+contract StakingToken is ERC20, ERC20Burnable, Ownable {
+    
+    uint256 public contractBalance;
+    mapping(address => uint256) public stakes;
+    mapping(address => uint256) public rewards;
+    address[] public stakers;
+    mapping(address => bool) public isStaker;
 
-        balance -= amount;
-        payable(owner).transfer(amount);
+    error NotOwner();
+    error InsufficientBalance(uint256 requested, uint256 available);
+    error TransferFailed();
+    error NoStake();
+    error ZeroAmount();
+
+    constructor(address payable initialOwner)
+        ERC20("StakingToken", "STK")
+        Ownable(initialOwner)
+    {
+        contractBalance = 0;
     }
 
-    // Function to reset the contract (only owner can reset)
-    function resetContract() public view  {
-        require(msg.sender == owner, "Only the owner can reset the contract");
-        revert("Contract reset has been reverted for demonstration purposes");
+
+    function mintTokens(uint256 amount) public onlyOwner {
+        _mint(owner(), amount);
     }
 
-    // Function to get the current balance of the contract
-    function getBalance() public view returns (uint256) {
-        return balance;
+    function burnTokens(uint256 amount) public {
+        _burn(msg.sender, amount);
+    }
+
+    function stakeTokens(uint256 amount) public {
+        if (amount == 0) {
+            revert ZeroAmount();
+        }
+        _transfer(msg.sender, address(this), amount);
+        stakes[msg.sender] += amount;
+        if (!isStaker[msg.sender]) {
+            stakers.push(msg.sender);
+            isStaker[msg.sender] = true;
+        }
+    }
+
+    function unstakeTokens(uint256 amount) public {
+        if (amount == 0) {
+            revert ZeroAmount();
+        }
+        if (stakes[msg.sender] < amount) {
+            revert InsufficientBalance({ requested: amount, available: stakes[msg.sender] });
+        }
+        stakes[msg.sender] -= amount;
+        if (stakes[msg.sender] == 0) {
+            isStaker[msg.sender] = false;
+        }
+        _transfer(address(this), msg.sender, amount);
+
+        assert(stakes[msg.sender] >= 0);
+    }
+    function distributeRewards(uint256 rewardAmount) public onlyOwner {
+        uint256 totalStaked = getTotalStaked();
+        if (totalStaked == 0) {
+            revert NoStake();
+        }
+
+        for (uint i = 0; i < stakers.length; i++) {
+            address staker = stakers[i];
+            uint256 stakerShare = (stakes[staker] * rewardAmount) / totalStaked;
+            rewards[staker] += stakerShare;
+        }
+
+        uint256 totalRewardsDistributed = 0;
+        for (uint i = 0; i < stakers.length; i++) {
+            totalRewardsDistributed += rewards[stakers[i]];
+        }
+        assert(totalRewardsDistributed <= rewardAmount);
+    }
+
+    function claimRewards() public {
+        uint256 reward = rewards[msg.sender];
+        if (reward == 0) {
+            revert NoStake();
+        }
+        rewards[msg.sender] = 0;
+        _mint(msg.sender, reward);
+    }
+    function getTotalStaked() public view returns (uint256) {
+        uint256 total = 0;
+        for (uint i = 0; i < stakers.length; i++) {
+            total += stakes[stakers[i]];
+        }
+        return total;
+    }
+    function getStakersCount() public view returns (uint256) {
+        return stakers.length;
+    }
+
+    function getStakerAt(uint256 index) public view returns (address) {
+        require(index < stakers.length, "Index out of bounds");
+        return stakers[index];
     }
 }
