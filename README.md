@@ -1,110 +1,83 @@
-# StakingToken
+# FoodDelivery Smart Contract
 
 ## Overview
+The `FoodDelivery` smart contract is a decentralized application built on the Ethereum blockchain that allows users to place, pay for, and manage food delivery orders. The contract ensures secure and transparent handling of order placements, payments, deliveries, and cancellations.
 
-StakingToken is a Solidity smart contract built on the Ethereum blockchain, implementing an ERC20 token with additional staking and reward distribution functionalities. It allows users to stake tokens, earn rewards, and manage their stakes. This contract uses OpenZeppelin libraries for security and standardization.
-
-## Features
-
-- **ERC20 Standard:** Implements standard ERC20 functions and interface.
-- **Token Minting and Burning:** Allows the owner to mint new tokens and users to burn their tokens.
-- **Staking Mechanism:** Users can stake tokens and receive rewards.
-- **Reward Distribution:** The owner can distribute rewards to stakers proportionally to their stakes.
-- **Claiming Rewards:** Users can claim their accumulated rewards.
-- **Access Control:** Utilizes OpenZeppelin's `Ownable` contract to restrict certain functions to the owner.
-
-## Dependencies
-
-- OpenZeppelin Contracts:
-  - `ERC20`
-  - `ERC20Burnable`
-  - `Ownable`
-
-## Prerequisites
-
-- Solidity ^0.8.0
-- Node.js with npm
-- Truffle or Hardhat for contract deployment
-- MetaMask or other Ethereum wallet for interaction
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Contract Details
 
 ### State Variables
+- `address public owner`: The owner of the contract, set to the address that deploys the contract.
+- `uint256 public orderCount`: The total number of orders placed.
+- `enum OrderStatus { Placed, Paid, Delivered, Cancelled }`: Enumeration representing the possible statuses of an order.
+- `struct Order`: A structure representing an order, containing:
+  - `uint256 id`: The unique ID of the order.
+  - `address customer`: The address of the customer who placed the order.
+  - `string foodItem`: The food item ordered.
+  - `uint256 price`: The price of the food item.
+  - `OrderStatus status`: The current status of the order.
 
-- `contractBalance`: Tracks the contract's token balance.
-- `stakes`: Maps addresses to their staked token amounts.
-- `rewards`: Maps addresses to their accumulated rewards.
-- `stakers`: An array of addresses that have staked tokens.
-- `isStaker`: Tracks whether an address is currently staking.
+### Mappings
+- `mapping(uint256 => Order) public orders`: Maps an order ID to an `Order` struct.
 
-### Errors
+### Events
+- `event OrderPlaced(uint256 orderId, address customer, string foodItem, uint256 price)`: Emitted when an order is placed.
+- `event OrderPaid(uint256 orderId)`: Emitted when an order is paid.
+- `event OrderDelivered(uint256 orderId)`: Emitted when an order is delivered.
+- `event OrderCancelled(uint256 orderId)`: Emitted when an order is cancelled.
 
-- `NotOwner()`: Thrown when a non-owner tries to call a restricted function.
-- `InsufficientBalance(requested, available)`: Thrown when a user tries to unstake more tokens than they have staked.
-- `TransferFailed()`: Thrown when a token transfer fails.
-- `NoStake()`: Thrown when there is no stake or reward to process.
-- `ZeroAmount()`: Thrown when a zero amount is provided for staking or unstaking.
+## Functions
 
-### Functions
+### Constructor
+- `constructor()`: Sets the owner of the contract to the address that deploys it.
 
-- `constructor(address payable initialOwner)`: Initializes the contract, setting the initial owner and token details.
-- `mintTokens(uint256 amount)`: Allows the owner to mint new tokens.
-- `burnTokens(uint256 amount)`: Allows users to burn their tokens.
-- `stakeTokens(uint256 amount)`: Allows users to stake tokens. Adds new stakers to the list.
-- `unstakeTokens(uint256 amount)`: Allows users to unstake tokens. Updates staker status if no tokens are left.
-- `distributeRewards(uint256 rewardAmount)`: Distributes rewards to stakers based on their staked amounts.
-- `claimRewards()`: Allows users to claim their accumulated rewards.
-- `getTotalStaked()`: Returns the total amount of tokens staked in the contract.
-- `getStakersCount()`: Returns the number of unique stakers.
-- `getStakerAt(uint256 index)`: Returns the address of a staker at a specific index.
+### Modifiers
+- `modifier onlyOwner()`: Restricts the function to be executed only by the owner.
+- `modifier onlyCustomer(uint256 _orderId)`: Restricts the function to be executed only by the customer who placed the order.
+
+### Core Functions
+- `function placeOrder(string memory _foodItem, uint256 _price) public`: Allows a user to place an order with a specified food item and price.
+- `function payForOrder(uint256 _orderId) public payable onlyCustomer(_orderId)`: Allows the customer to pay for their order. The payment must match the order price.
+- `function deliverOrder(uint256 _orderId) public onlyOwner`: Allows the owner to mark an order as delivered.
+- `function cancelOrder(uint256 _orderId) public onlyCustomer(_orderId)`: Allows the customer to cancel their order if it is still in the 'Placed' status.
+
+### Utility Functions
+- `function assertOrder(uint256 _orderId) public view`: Asserts that the given order ID is valid and matches the order stored in the contract.
+- `function revertOrder(uint256 _orderId) public view`: Reverts if the given order ID is invalid.
 
 ## Usage
 
-### Deployment
+### Deploying the Contract
+1. Deploy the `FoodDelivery` contract to the Ethereum blockchain.
+2. The deployer's address will be set as the `owner` of the contract.
 
-1. Clone the repository and navigate to the project directory.
-2. Install dependencies using `npm install`.
-3. Compile the contract using `truffle compile` or `npx hardhat compile`.
-4. Deploy the contract using `truffle migrate` or `npx hardhat run scripts/deploy.js`.
+### Placing an Order
+1. Call `placeOrder` with the food item and price.
+2. The contract will emit an `OrderPlaced` event with the order details.
 
-### Interaction
+### Paying for an Order
+1. Call `payForOrder` with the order ID and send the exact payment amount.
+2. The contract will update the order status to `Paid` and emit an `OrderPaid` event.
 
-1. Use a web3 provider (like MetaMask) to interact with the deployed contract.
-2. Call `mintTokens` to mint new tokens (owner only).
-3. Use `stakeTokens` to stake tokens.
-4. Use `unstakeTokens` to unstake tokens.
-5. Call `distributeRewards` to distribute rewards (owner only).
-6. Use `claimRewards` to claim your accumulated rewards.
+### Delivering an Order
+1. The owner calls `deliverOrder` with the order ID.
+2. The contract updates the order status to `Delivered` and emits an `OrderDelivered` event.
 
-### Example
+### Cancelling an Order
+1. The customer calls `cancelOrder` with the order ID.
+2. The contract updates the order status to `Cancelled` and emits an `OrderCancelled` event.
 
-```solidity
-// Deploying the contract
-const StakingToken = artifacts.require("StakingToken");
-
-module.exports = function(deployer) {
-  deployer.deploy(StakingToken, "0xYourEthereumAddress");
-};
-
-// Staking tokens
-await stakingToken.stakeTokens(web3.utils.toWei('10', 'ether'), { from: userAddress });
-
-// Unstaking tokens
-await stakingToken.unstakeTokens(web3.utils.toWei('5', 'ether'), { from: userAddress });
-
-// Distributing rewards
-await stakingToken.distributeRewards(web3.utils.toWei('100', 'ether'), { from: ownerAddress });
-
-// Claiming rewards
-await stakingToken.claimRewards({ from: userAddress });
-```
+## Notes
+- Ensure the food item string is not empty and the price is greater than zero when placing an order.
+- Payments must match the exact price specified in the order.
+- Only the owner can deliver orders.
+- Customers can only cancel orders that are still in the 'Placed' status.
 
 ## Security Considerations
+- The contract includes checks to ensure only the rightful customer or owner can execute specific actions.
+- The `assertOrder` and `revertOrder` functions help validate order existence and integrity.
 
-- Ensure only the contract owner can mint new tokens and distribute rewards.
-- Validate user inputs to prevent unexpected behaviors.
-- Regularly audit the contract code to identify and fix potential vulnerabilities.
-
-## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+## Contact
+For any questions or issues, please open an issue on the [GitHub repository](https://github.com/your-repo/food-delivery).
