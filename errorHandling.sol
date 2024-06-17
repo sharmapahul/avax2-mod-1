@@ -1,107 +1,90 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+contract FoodDelivery {
+    address public owner;
+    uint256 public orderCount = 0;
 
-contract StakingToken is ERC20, ERC20Burnable, Ownable {
-    
-    uint256 public contractBalance;
-    mapping(address => uint256) public stakes;
-    mapping(address => uint256) public rewards;
-    address[] public stakers;
-    mapping(address => bool) public isStaker;
+    enum OrderStatus { Placed, Paid, Delivered, Cancelled }
 
-    error NotOwner();
-    error InsufficientBalance(uint256 requested, uint256 available);
-    error TransferFailed();
-    error NoStake();
-    error ZeroAmount();
-
-    constructor(address payable initialOwner)
-        ERC20("StakingToken", "STK")
-        Ownable(initialOwner)
-    {
-        contractBalance = 0;
+    struct Order {
+        uint256 id;
+        address customer;
+        string foodItem;
+        uint256 price;
+        OrderStatus status;
     }
 
+    mapping(uint256 => Order) public orders;
 
-    function mintTokens(uint256 amount) public onlyOwner {
-        _mint(owner(), amount);
+    event OrderPlaced(uint256 orderId, address customer, string foodItem, uint256 price);
+    event OrderPaid(uint256 orderId);
+    event OrderDelivered(uint256 orderId);
+    event OrderCancelled(uint256 orderId);
+
+    constructor() {
+        owner = msg.sender;
     }
 
-    function burnTokens(uint256 amount) public {
-        _burn(msg.sender, amount);
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action");
+        _;
     }
 
-    function stakeTokens(uint256 amount) public {
-        if (amount == 0) {
-            revert ZeroAmount();
-        }
-        _transfer(msg.sender, address(this), amount);
-        stakes[msg.sender] += amount;
-        if (!isStaker[msg.sender]) {
-            stakers.push(msg.sender);
-            isStaker[msg.sender] = true;
-        }
+    modifier onlyCustomer(uint256 _orderId) {
+        require(msg.sender == orders[_orderId].customer, "Only the customer can perform this action");
+        _;
     }
 
-    function unstakeTokens(uint256 amount) public {
-        if (amount == 0) {
-            revert ZeroAmount();
-        }
-        if (stakes[msg.sender] < amount) {
-            revert InsufficientBalance({ requested: amount, available: stakes[msg.sender] });
-        }
-        stakes[msg.sender] -= amount;
-        if (stakes[msg.sender] == 0) {
-            isStaker[msg.sender] = false;
-        }
-        _transfer(address(this), msg.sender, amount);
+    function placeOrder(string memory _foodItem, uint256 _price) public {
+        require(bytes(_foodItem).length > 0, "Food item must be specified");
+        require(_price > 0, "Price must be greater than zero");
 
-        assert(stakes[msg.sender] >= 0);
-    }
-    function distributeRewards(uint256 rewardAmount) public onlyOwner {
-        uint256 totalStaked = getTotalStaked();
-        if (totalStaked == 0) {
-            revert NoStake();
-        }
+        orderCount++;
+        orders[orderCount] = Order(orderCount, msg.sender, _foodItem, _price, OrderStatus.Placed);
 
-        for (uint i = 0; i < stakers.length; i++) {
-            address staker = stakers[i];
-            uint256 stakerShare = (stakes[staker] * rewardAmount) / totalStaked;
-            rewards[staker] += stakerShare;
-        }
-
-        uint256 totalRewardsDistributed = 0;
-        for (uint i = 0; i < stakers.length; i++) {
-            totalRewardsDistributed += rewards[stakers[i]];
-        }
-        assert(totalRewardsDistributed <= rewardAmount);
+        emit OrderPlaced(orderCount, msg.sender, _foodItem, _price);
     }
 
-    function claimRewards() public {
-        uint256 reward = rewards[msg.sender];
-        if (reward == 0) {
-            revert NoStake();
-        }
-        rewards[msg.sender] = 0;
-        _mint(msg.sender, reward);
-    }
-    function getTotalStaked() public view returns (uint256) {
-        uint256 total = 0;
-        for (uint i = 0; i < stakers.length; i++) {
-            total += stakes[stakers[i]];
-        }
-        return total;
-    }
-    function getStakersCount() public view returns (uint256) {
-        return stakers.length;
+    function payForOrder(uint256 _orderId) public payable onlyCustomer(_orderId) {
+        Order storage order = orders[_orderId];
+
+        require(msg.value == order.price, "Incorrect payment amount");
+        require(order.status == OrderStatus.Placed, "Order must be in 'Placed' status");
+
+        order.status = OrderStatus.Paid;
+
+        emit OrderPaid(_orderId);
     }
 
-    function getStakerAt(uint256 index) public view returns (address) {
-        require(index < stakers.length, "Index out of bounds");
-        return stakers[index];
+    function deliverOrder(uint256 _orderId) public onlyOwner {
+        Order storage order = orders[_orderId];
+
+        require(order.status == OrderStatus.Paid, "Order must be in 'Paid' status");
+
+        order.status = OrderStatus.Delivered;
+
+        emit OrderDelivered(_orderId);
+    }
+
+    function cancelOrder(uint256 _orderId) public onlyCustomer(_orderId) {
+        Order storage order = orders[_orderId];
+
+        require(order.status == OrderStatus.Placed, "Order can only be cancelled if it is in 'Placed' status");
+
+        order.status = OrderStatus.Cancelled;
+
+        emit OrderCancelled(_orderId);
+    }
+
+    function assertOrder(uint256 _orderId) public view {
+        assert(_orderId > 0 && _orderId <= orderCount);
+        assert(orders[_orderId].id == _orderId);
+    }
+
+    function revertOrder(uint256 _orderId) public view {
+        if (_orderId == 0 || _orderId > orderCount) {
+            revert("Order does not exist");
+        }
     }
 }
